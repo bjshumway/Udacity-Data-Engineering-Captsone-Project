@@ -12,6 +12,8 @@ The goal of this project is to create an ETL Pipeline to pull data from IMDB (Th
 ## What queires would be run based on this model?
 Many different queires can be run against the data model I have created. It include things such as "What movies are in the 99th percentile" (as far as rating), "What genres are the most common?", "How does runtime affect a movie's average rating", "How has the popularity of different movie genres changed from decade to decade?".
 
+Each of these questions are now answered! Checkout the file "Four Queries to Gain Business Insight on The Movie Industry.docx" as proof that I ran the queries, and that the data is properly populated.
+
 ## How is Airflow Incorporated
 The advantages of using airflow in this project are many. Airflow allows you to create a direct-graph set of tasks, and run them in the appropriate order, with "dependent" tasks waiting until their "parent" task finishes first. By explicitly breaking your code into tasks, your code becomes more modular. You can define operators for example that you can think of as a "type of task"... so you can run many tasks of that type with slightly different parameters. Airflow also allows you to run tasks in parralel, which can help speed up the ETL pipeline. Airflow gives you a "birds eye view" of your ETL pipeline because you can see your move through their various states. Airflow also offers the ability to back-fill tasks, so your code can run for events that occurred in the past, e.g. if you have to backfill tax records... Airflow can run your code for 2020/2021/2022 simultaniously.
 

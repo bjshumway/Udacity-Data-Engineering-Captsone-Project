@@ -6,11 +6,6 @@ from airflow.operators import (StageToRedshiftOperator, LoadFactOperator,
                                 LoadDimensionOperator, DataQualityOperator)
 from helpers import SqlQueries
 
-
-
-AWS_KEY = 'AKIA3FUQ2COOPQQCJREP'
-AWS_SECRET = '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'
-
 default_args = {
     'owner': 'IMDB_ANALYSIS',
     'start_date': datetime(2022, 10, 2),

@@ -4,6 +4,8 @@
 ## *Important* (please read)
 To use Apache Airflow I utilized the workspace for the project "Data Pipelines". Please go to that project and look at the files "final_project_dag.py", "create_tables.sql", and "sql_queries.py". If you intend to try running my code to prove to yourself that it works... please run "create_tables.sql" in your Amazon Redshift... then you can go ahead and run ./opt/airflow/start.sh. 
 
+To view the "Data Dictionary" see the image "Data Dictionary.png". 
+
 ## Project Goal
 The goal of this project is to create an ETL Pipeline to pull data from IMDB (The preiminent movie database online), and put it into a standard data warehousing data model... so that statistics / graphs can be run on it for business insight.
 
@@ -16,15 +18,18 @@ The advantages of using airflow in this project are many. Airflow allows you to 
 Airflow and Amazon Redshift are a natural fit. Database developers who use tools like Redshift often don't realize that techniques such as Airflow are so powerful. This is because they are in the "bad habit" of running their code "top-to-bottom" from "installation files".... which breads messiness and confusion. Enter Apache Airflow which, for the reasons mentioned in the previous paragraph, solves this issue.
 
 ## Model Choices
+
+To view the "Data Dictionary" see the image "Data Dictionary.png". 
+
 The model I chose to create is a standard star schema. I created the fact table "IMDB_MEDIA", and the four dimensional tables "imdb_genres", "imdb_rating", "imdb_runtime", and "imdb_year". At first I thought this might not be enough as these tables are only populated from two IMDB files found at [here](https://www.imdb.com/interfaces)... namely title.basics.tsv.gz and title.ratings.tsv.gz.... my original goal was to also include the file name.basics.tsv.gz.
 
-### title.basics.tsv.gz
+### First Data Source: title.basics.tsv.gz
 This file contains 1 million rows of the different kinds of media that IMDB tracks... I use the term "media" to represent movies, t.v. shows, video games, etc.. The file contains the title, genre, start year / end year, runtime (in minutes), etc.
 
-### title.rating.tsv.gz
+### Second Data Source: title.rating.tsv.gz
 This file has a 1 to 0 relationship with title.basics.... basically any peace of media either has been rated (by 1 or more people) or it hasn't ever gotten a rating. The file contains the rating, and the number or votes, for each media that has been rated
 
-### name.basic.tsv.gz
+### Third Data Source: name.basic.tsv.gz (Not used... but I did explore it)
 This contains the names of actors / actresses / producers / directors, etc. as well as their information such as year of birth, year of death (assuming they passed away), and what media (i.e.e movies/t.v. shows etc.) they are best known for. This is the biggest file by far with over 10 million rows! I was originally very enticed in adding the data from name.basic.tsv.gz into my data model. I wanted to include a "cool" dimension table called "imdb_average_actor_rating", so that you can compare different films by their actor's rating, and see the relationship between the actor's ratings and the film's rating. However... since the actors don't have a rating in the name.basic.tsv.gz file... I would have to write a query that would average their rating across all movies they are known for.... and then for each media on my fact table... average the rating of the actors in that fact table. That last step is pretty hard because with 1 million rows of media... and 10 million rows of names... you're looking at gargantuan amounts of looping in the join clause of the query. Okay... maybe we can scale back and try to be less cool! I learned here that "less is more"... if you look at the section "What queires would be run based on this model"... you can see that even from two IMDB files, you can gain a lot of insight on the movie industry!
 
 So now lets return to "Model Choices", and consider how I setup my dimension tables.
@@ -46,7 +51,34 @@ The last dimension table is imdb_year... which contains a column "decade", so th
 I think the earlier paragraph "How is Airflow Incorporated" largely answers this question. However I should point out the advantages of amazon redshift. First, since its in the cloud, you don't have to deal with the difficult decisions of building a custom database. You don't have to, for example, "buy more ram", or "deal with power outages" etc. Now where Amazon Redshift really shines is that it's built primarilly for data-warehousing. For example, it uses columnar format (instead of row formatting) which while making complex queires rather slow.... since data-warehousing queires are pretty straightforward (let's face it... a star schema lends itself to simple queires) the query time is much faster. Queries where you need to lookup subsets of your data... for example, a sum on a "salary" column, become much faster with columnar formatting because all of the data is gathered right away from the single column... you don't have to go hunting through row-after-row of data... meaning less hard-drive disk-seeks. Redshift also uses distkeys to split your query so that it can be run on multiple processors simultaniously.
 
 ## The steps of the process.
-First, we use Amazon S3 to store the two files "title.basics.tsv" and "title.rating.tsv"... in the real world we would probably use a database connection the IMDB's servers (after negotiating a business deal with them)... but for now this is a fine "stand-in" for "proof-of-concept". Now the fun begins. We setup Apache Airflow to run on a schedule... so that it pulls this data from S3 and writes it to staging tables in Redshift. From here we create the fact table. After that we create the dimension tables. Finally we perform our data checks to make sure the data is itself valid. Since this is a "proof-of-concept" the only two data checks I do are that the fact table (imdb_media) doesn't have any Null titles... and that imdb_rating (a dimension table) has the row where the rating is '9'.
+To run the code you will need an environment setup for Amazon Redshift and Apache Airflow. You will want to enter two 'connections' into Aifrlow... namely one for Redshift (i.e. the host, the port, the connection type of "PostGres", etc.)... and the one for AWS (the usernam/password, namely the AWS Access Key and the AWS Secret Key). I used the environment already setup for me by Udacity in their project "Data Pipelines"... so dear reader if you are grading this project, please check there to see my code in that project... you can run it there. Once the environment is setup, you can run "/opt/airflow/start.sh" to start the airflow server. Then navigate to the server URL, and you will see the DAG called "imdb_analysis13". The DAG should start running by default... but if it doesn't then make sure the DAG is turned "On". If it still doesn't start running right away, then you can click the 'run' button to run the DAG.
+
+
+Once the DAG starts running here are the steps it takes:
+
+### Task 1: Start Operator
+This simply notes that the DAG started running
+
+### Task 2 & 3: (Run simultaniously) stage_titles_to_redshift  & stage_title_ratings_to_redshift 
+These run the "COPY" command to copy the two files from S3 to Redshift
+
+### Task 4: load_media_table 
+This builds the fact table "media" by querying the two staging tables
+
+### Task 5,6,7,8: (Run simultaniously) load_genres_dimension_table load_rating_dimension_table, load_runtime_dimension_table, load_year_dimension_table 
+This builds the dimension tables
+
+### Task 9: run_quality_checks 
+This runs two data quality checks (discussed below)
+
+### Task 10: End Operator
+This simply notes that the DAG finished running
+
+
+### Here is a full synopsis of how the ETL pipeline flows start to finish:
+First, we use Amazon S3 to store the two files "title.basics.tsv" and "title.rating.tsv"... in the real world we would probably use a database connection the IMDB's servers (after negotiating a business deal with them)... but for now this is a fine "stand-in" for "proof-of-concept". Now the fun begins. We setup Apache Airflow to run on a schedule... so that it pulls this data from S3 and writes it to staging tables in Redshift. From here we create the fact table. After that we create the dimension tables. Finally we perform our data quality checks to make sure the data is itself valid. Since this is a "proof-of-concept" I only include TWO data checks. These are
+1. The fact table (imdb_media) doesn't have any Null titles... 
+2. The dimension table imdb_rating has a row where the rating is '9'.
 
 ## Propose how often the data should be updated and why.
 If this project were to no longer be "proof of concept", I would imagine the data should be run on a monthly basis. This is because the statistics it gathers are so vast, that I don't foresee big changes in the data on a day-to-day or even weekly basis. This is also because the scope of the project would increase (e.g. including the "names" file like I mentioned above) since IMDB actually has over a dozen of these files, and they are all a goldmine. You can save money by running the ETL process on a monthly basis rather than a weekly basis, especially if the ETL process takes hours to run (as I expect it would). However... if we are a "lean" startup company and truly only care about data from the two files (name.basic and ratings.basic)... well... maybe we would want to run Apache Airflow on a weekly basis... since it only takes a few minutes to run... and who knows... maybe we are looking for quick short-lived trends, rather than large overall trends.
